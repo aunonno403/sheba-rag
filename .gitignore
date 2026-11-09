@@ -5,3 +5,4 @@ __pycache__/
 data/raw/
 data/text/
 data/chroma/
+data/manual/*_files/

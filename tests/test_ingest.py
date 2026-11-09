@@ -41,6 +41,26 @@ def test_empty_or_bot_check_source_fails_and_clears_its_cache(monkeypatch, tmp_p
     assert list(tmp_path.rglob("*.html")) == [] and list(tmp_path.rglob("*.json")) == []
 
 
+def test_saved_local_file_is_read_and_never_deleted(monkeypatch, tmp_path):
+    monkeypatch.setattr(ingest.config, "ROOT", tmp_path)
+    monkeypatch.setattr(ingest.config, "TEXT_DIR", tmp_path / "text")
+    saved = tmp_path / "manual" / "fees.html"
+    saved.parent.mkdir()
+    saved.write_text("<html><body><article><p>Just a moment...</p></article></body></html>", encoding="utf-8")
+    src = {**SRC, "file": "manual/fees.html"}
+    assert ingest.download(src) == saved
+    monkeypatch.setattr(ingest, "read_sources", lambda: [src])
+    with pytest.raises(SystemExit, match="nid_faq"):  # too little text: fails...
+        ingest.load_documents()
+    assert saved.exists()  # ...but the hand-saved page is kept
+
+
+def test_missing_saved_file_is_a_clear_failure(monkeypatch, tmp_path):
+    monkeypatch.setattr(ingest.config, "ROOT", tmp_path)
+    with pytest.raises(requests.RequestException, match="saved file not found"):
+        ingest.download({**SRC, "file": "manual/missing.html"})
+
+
 def test_changed_url_gets_a_new_cache_file():
     moved = {**SRC, "url": "https://a.example/faq-v2"}
     assert ingest.cache_name(SRC) != ingest.cache_name(moved)

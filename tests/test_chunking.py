@@ -27,9 +27,18 @@ def test_sentences_split_on_danda_and_english_period():
     assert s == ["প্রথম বাক্য।", "দ্বিতীয় বাক্য?", "Third one.", "Fourth"]
 
 
+def test_short_numbered_list_is_packed_not_one_chunk_per_line():
+    offices = "Currently following e-Passport Offices are functional:\n" + "\n".join(
+        f"{i}. Office number {i}" for i in range(1, 41))
+    chunks = sentence_chunks([{"page": None, "text": offices}], max_chars=1000)
+    assert len(chunks) == 3  # was 41: one tiny chunk per office
+    assert all(len(c["text"]) >= 300 for c in chunks[:-1])  # each closes at the first section after 300 chars
+    assert [c["section"] for c in chunks] == ["1–13", "14–28", "29–40"]
+
+
 def test_sentence_chunks_respect_sections_and_size():
     pages = [{"page": None, "text": LAW}]
-    chunks = sentence_chunks(pages, max_chars=60)
+    chunks = sentence_chunks(pages, max_chars=60, min_chars=0)
     assert all(len(c["text"]) <= 60 for c in chunks)
     # no chunk mixes text from two sections
     assert not any("১। (১)" in c["text"] and "২। “" in c["text"] for c in chunks)
@@ -38,7 +47,7 @@ def test_sentence_chunks_respect_sections_and_size():
 
 def test_sentence_chunks_overlap_one_sentence():
     text = "১। ক খ গ। ঘ ঙ চ। ছ জ ঝ। ঞ ট ঠ।"
-    chunks = sentence_chunks([{"page": 3, "text": text}], max_chars=20)
+    chunks = sentence_chunks([{"page": 3, "text": text}], max_chars=20, min_chars=0)
     assert len(chunks) >= 2
     last_of_first = split_sentences(chunks[0]["text"])[-1]
     assert chunks[1]["text"].startswith(last_of_first)

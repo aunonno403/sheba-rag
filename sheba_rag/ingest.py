@@ -19,7 +19,7 @@ from sheba_rag.loaders import html_pages, pdf_pages
 
 # land.gov.bd publishes an IPv6 address that does not answer; force IPv4 for all downloads
 urllib3.util.connection.allowed_gai_family = lambda: socket.AF_INET
-# dip.gov.bd sends an incomplete certificate chain; the OS store (unlike certifi) can complete it
+# some .gov.bd sites (dip.gov.bd did) send an incomplete certificate chain; the OS store can complete it
 truststore.inject_into_ssl()
 
 
@@ -37,6 +37,11 @@ def cache_name(src):
 
 
 def download(src):
+    if src.get("file"):  # a page saved by hand in a browser (the site blocks scripts); `url` stays the citation
+        path = config.ROOT / src["file"]
+        if not path.exists():
+            raise requests.RequestException(f"saved file not found: {src['file']}")
+        return path
     path = config.RAW_DIR / src["service"] / f"{cache_name(src)}.{src['type']}"
     if not path.exists():
         r = requests.get(src["url"], timeout=60, headers={"User-Agent": "Mozilla/5.0 (sheba-rag)"})
@@ -71,8 +76,9 @@ def load_documents():
         # under 200 characters is an error or bot-check page ("Just a moment..."), not a document;
         # the smallest real source (the land fees table) has 578
         if sum(len(p["text"].strip()) for p in pages) < MIN_DOC_CHARS:
-            print(f"[fail] {src['id']}: too little text (cache cleared, the next run downloads it again)")
-            path.unlink(missing_ok=True)  # otherwise every later run re-reads the same empty cache
+            print(f"[fail] {src['id']}: too little text (cache cleared, the next run reads it again)")
+            if not src.get("file"):  # never delete a hand-saved page, it is the only copy
+                path.unlink(missing_ok=True)  # otherwise every later run re-reads the same empty download
             (config.TEXT_DIR / f"{cache_name(src)}.json").unlink(missing_ok=True)
             failed.append(src["id"])
             continue

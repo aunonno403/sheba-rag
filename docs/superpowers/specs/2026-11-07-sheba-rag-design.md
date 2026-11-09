@@ -197,3 +197,6 @@ BM25 search, reranking, streaming, chat memory, auth, Docker, deployment.
 - Chroma `ef_search` raised to 200; the default of 10 made top-5 results vary between identical runs.
 - Sentence chunks are capped at 1,000 characters (not ~400 tokens) so both chunkers compare at equal size.
 - Downloads force IPv4 (land.gov.bd) and use the OS trust store via `truststore` (dip.gov.bd's incomplete chain).
+- 2026-11-10: the dip.gov.bd passport page was replaced by six epassport.gov.bd pages saved by hand in a browser
+  (`data/manual/`, `file` column in `sources.csv`), because the site blocks scripted access and the older page
+  contradicted it. Sentence chunking now packs short numbered sections (lists) up to 300 characters.

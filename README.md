@@ -55,15 +55,30 @@ flowchart LR
   `--psm 4` keeps them. OCR of tables still interleaves columns, which is a known limit.
 - **Portal HTML hides content.** The NID FAQ puts every question in a bare `<strong>`, which trafilatura
   drops, leaving answers without questions. Converting those tags to paragraphs recovered all 44 questions.
-- **Infrastructure quirks.** land.gov.bd advertises an IPv6 address that never answers, and dip.gov.bd sends
-  an incomplete TLS certificate chain. The downloader forces IPv4 and uses the OS trust store (`truststore`)
-  instead of disabling verification.
+- **Infrastructure quirks.** land.gov.bd advertises an IPv6 address that never answers, and dip.gov.bd (an
+  earlier source) sent an incomplete TLS certificate chain. The downloader forces IPv4 and uses the OS trust
+  store (`truststore`) instead of disabling verification.
+- **The key passport pages block scripts.** epassport.gov.bd is a JavaScript app that refuses scripted requests,
+  and fees and the latest rules live only there. Rather than work around its bot protection, the pages were
+  saved by hand in a browser into `data/manual/`; `sources.csv` points at those files while citations keep the
+  official URL and the date saved.
+- **Sources disagree over time.** The older dip.gov.bd copy of the passport rules said applicants over 65 get a
+  5-year passport and that super-urgent delivery needs a police clearance. The current epassport.gov.bd page
+  cancels both. With both indexed the assistant could contradict itself, so the outdated page was removed.
+- **Numbered lists are not law sections.** Treating every numbered line as a section turned the list of 70+
+  passport offices into 140 chunks like "2. Jatrabari". Short sections are now packed together until a chunk
+  reaches 300 characters, with range labels such as "§ 1–13".
 
 ## Corpus
 
 | Service | Source | Lang | Type |
 |---|---|---|---|
-| Passport | [পাসপোর্ট পেতে করণীয়](https://dip.gov.bd/pages/static-pages/6922dc55933eb65569e0fc65), Department of Immigration and Passports | bn | HTML |
+| Passport | [e-Passport fees](https://www.epassport.gov.bd/instructions/passport-fees), inside Bangladesh and at missions | en | HTML, saved by hand |
+| Passport | [ই-পাসপোর্ট ফরম পূরণের নির্দেশাবলী](https://www.epassport.gov.bd/instructions/instructions) (application rules) | bn | HTML, saved by hand |
+| Passport | [Documents checklist for e-Passport enrollment](https://www.epassport.gov.bd/landing/notices/160) | bn | HTML, saved by hand |
+| Passport | [e-Passport required documents](https://www.epassport.gov.bd/landing/notices/34) | en, bn | HTML, saved by hand |
+| Passport | [List of functional e-Passport offices](https://www.epassport.gov.bd/landing/notices/33) (last updated 2023) | en | HTML, saved by hand |
+| Passport | [5 steps to your e-Passport](https://www.epassport.gov.bd/instructions/five-step-to-your-epassport) | en | HTML, saved by hand |
 | Passport | [Bangladesh Passport Order 1973](http://bdlaws.minlaw.gov.bd/act-print-445.html) | en | HTML |
 | NID | [NID FAQ](https://services.nidw.gov.bd/nid-pub/faq?tab=faq-general), Election Commission | bn | HTML |
 | NID | [জাতীয় পরিচয় নিবন্ধন আইন, ২০২৩](http://bdlaws.minlaw.gov.bd/act-print-1458.html) | bn | HTML |
@@ -71,7 +86,12 @@ flowchart LR
 | Land | [ভূমি উন্নয়ন কর আইন, ২০২৩](http://bdlaws.minlaw.gov.bd/act-print-1449.html) | bn | HTML |
 | Land | Ministry of Land citizen charter, 53 pages | bn | PDF, OCR |
 
-Add a document by dropping a row into `data/sources.csv` and re-running ingestion.
+The epassport.gov.bd pages were saved on 2026-11-10 and will go stale when the site changes; re-save them
+and re-run ingestion.
+
+Add a document by dropping a row into `data/sources.csv` and re-running ingestion. For a page that blocks
+scripts, save it from your browser into `data/manual/` and put its path in the `file` column; the `url`
+column stays the official address used in citations.
 
 ## Setup (Windows, tested; Linux/macOS similar)
 
@@ -106,9 +126,9 @@ Tests (no network or API key needed): `pytest`
 
 ## Evaluation
 
-`eval/testset.jsonl` has 30 questions: 25 answerable (8 passport, 9 NID, 8 land; 6 in English, several
+`eval/testset.jsonl` has 34 questions: 29 answerable (12 passport, 9 NID, 8 land; 8 in English, several
 asking in English about Bangla-only sources) and 5 unanswerable ones, some deliberately close to the corpus
-(for example the passport fee, which no source states). Each answerable item has an expected answer, the
+(for example the NID reissue fee, which no source states). Each answerable item has an expected answer, the
 expected document, and an evidence phrase copied from the source.
 
 ```powershell
@@ -129,23 +149,20 @@ Metrics:
 
 ### Results
 
-Retrieval, 25 answerable questions, top-5:
+Retrieval, 29 answerable questions, top-5:
 
 | chunker | embedding | hit@1 | hit@5 | MRR | evidence@5 |
 |---|---|---|---|---|---|
-| sentence | bge-m3 | 0.96 | 1.00 | 0.98 | **1.00** |
-| fixed | bge-m3 | 0.96 | 1.00 | 0.97 | 0.96 |
-| sentence | multilingual-e5-base | 0.88 | 0.92 | 0.89 | 0.88 |
-| fixed | multilingual-e5-base | 0.84 | 0.92 | 0.88 | 0.84 |
+| sentence | bge-m3 | 0.90 | 1.00 | 0.94 | **1.00** |
+| fixed | bge-m3 | 0.93 | 1.00 | 0.95 | 0.97 |
+| sentence | multilingual-e5-base | 0.83 | 0.90 | 0.84 | 0.86 |
+| fixed | multilingual-e5-base | 0.72 | 0.90 | 0.80 | 0.83 |
 
-Answers, all 30 questions, LLM `gemini/gemini-3.5-flash-lite`, judge `gemini/gemini-3.1-flash-lite`:
+Answers, all 34 questions, LLM `gemini/gemini-3.5-flash-lite`, judge `gemini/gemini-3.1-flash-lite`:
 
-| chunker | embedding | correctness | groundedness | abstain on unanswerable | false "I don't know" |
-|---|---|---|---|---|---|
-| sentence | bge-m3 | 0.96 | 1.00 | 1.00 | 0.04 |
-| fixed | bge-m3 | 1.00 | 1.00 | 1.00 | 0.00 |
-
-Per-question answers and verdicts are in `eval/results.jsonl`. The 0.04 is one question, see below.
+*Pending: being re-run after the corpus change of 2026-11-10 (new epassport.gov.bd pages, list packing).
+The previous run on the 30-question set scored 0.96-1.00 on every answer metric; see `eval/results.md`.
+The findings below still refer to that run until it is redone.*
 
 Findings:
 - **The embedding model matters most.** bge-m3 beats multilingual-e5-base by 8-12 points on every metric,
@@ -183,13 +200,13 @@ api/main.py  FastAPI: POST /ask, GET /health
 ui/app.py    Streamlit chat UI
 eval/        testset.jsonl  run_eval.py  results.md
 tests/       unit tests (chunking, loaders, answer logic, API)
-data/        sources.csv (raw files, extracted text and the index are generated, not committed)
+data/        sources.csv, manual/ (hand-saved pages); downloads, extracted text and the index are generated
 ```
 
 ## Limitations and next steps
 
-- The corpus is small. Passport fees and step-by-step e-passport instructions live on epassport.gov.bd,
-  which blocks scripted downloads.
+- The corpus is small, and the hand-saved epassport.gov.bd pages have to be re-saved by hand when the site
+  changes. Step-by-step mutation instructions from upazila land offices are still missing.
 - Table-aware OCR would make the citizen charter's fee and timeline tables much cleaner.
 - Hybrid search (BM25 plus vectors) would likely help exact terms such as fee names and section numbers.
 - Gemini's free tier is tight: 5 requests per minute per model, and a daily cap that was 20 requests for

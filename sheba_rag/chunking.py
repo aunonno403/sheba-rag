@@ -33,23 +33,40 @@ def _windows(text, size, overlap):
     return [text[i:i + size] for i in range(0, max(len(text) - overlap, 1), step)]
 
 
-def sentence_chunks(pages, max_chars=1000):
+def _label(sections):
+    """Section label for a chunk: "৭", or "1–20" when it spans several short sections."""
+    named = [s for s in sections if s]
+    if not named:
+        return None
+    return named[0] if named[0] == named[-1] else f"{named[0]}–{named[-1]}"
+
+
+def sentence_chunks(pages, max_chars=1000, min_chars=300):
+    """Pack sentences into chunks of at most max_chars. A numbered section starts a new chunk, unless the
+    current chunk is still under min_chars: then short sections (list items like "19. Sylhet") are packed
+    together instead of becoming one tiny chunk each."""
     chunks = []
     for p in pages:
+        cur = []  # (sentence, section) pairs
+
+        def flush():
+            chunks.append({"text": " ".join(s for s, _ in cur), "section": _label([sec for _, sec in cur]),
+                           "page": p["page"]})
+
         for section, sec_text in split_sections(p["text"]):
-            sents = []
+            if cur and len(" ".join(s for s, _ in cur)) >= min_chars:
+                flush()
+                cur = []
             for s in split_sentences(sec_text):
                 # a single over-long "sentence" (e.g. an OCR'd table row) is hard-split
-                sents += _windows(s, max_chars, 0) if len(s) > max_chars else [s]
-            cur = []
-            for s in sents:
-                if cur and len(" ".join(cur + [s])) > max_chars:
-                    chunks.append({"text": " ".join(cur), "section": section, "page": p["page"]})
-                    last = cur[-1]
-                    cur = [last] if len(last) + 1 + len(s) <= max_chars else []  # one-sentence overlap
-                cur.append(s)
-            if cur:
-                chunks.append({"text": " ".join(cur), "section": section, "page": p["page"]})
+                for part in _windows(s, max_chars, 0) if len(s) > max_chars else [s]:
+                    if cur and len(" ".join(x for x, _ in cur + [(part, None)])) > max_chars:
+                        flush()
+                        last = cur[-1]
+                        cur = [last] if len(last[0]) + 1 + len(part) <= max_chars else []  # one-sentence overlap
+                    cur.append((part, section))
+        if cur:
+            flush()
     return chunks
 
 
