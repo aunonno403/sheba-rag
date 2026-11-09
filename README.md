@@ -82,7 +82,7 @@ bge-m3 runs in fp16 on a 4 GB laptop GPU.
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
-pip install torch --index-url https://download.pytorch.org/whl/cu126   # skip on CPU-only machines
+pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cu126   # skip on CPU-only machines
 pip install -r requirements.txt
 copy .env.example .env      # then put your GEMINI_API_KEY in .env
 
@@ -142,23 +142,27 @@ Answers, all 30 questions, LLM `gemini/gemini-3.5-flash-lite`, judge `gemini/gem
 
 | chunker | embedding | correctness | groundedness | abstain on unanswerable | false "I don't know" |
 |---|---|---|---|---|---|
-| sentence | bge-m3 | 1.00 | 1.00 | 1.00 | 0.00 |
+| sentence | bge-m3 | 0.96 | 1.00 | 1.00 | 0.04 |
 | fixed | bge-m3 | 1.00 | 1.00 | 1.00 | 0.00 |
 
-Per-question answers and verdicts are in `eval/results.jsonl`.
+Per-question answers and verdicts are in `eval/results.jsonl`. The 0.04 is one question, see below.
 
 Findings:
 - **The embedding model matters most.** bge-m3 beats multilingual-e5-base by 8-12 points on every metric,
   and it handles English questions about Bangla documents well.
 - **Sentence-aware chunking helps a little.** At document level the chunkers tie. With the stricter
   evidence check, fixed windows lose an answer that was cut across a window boundary.
-- **The answer metrics saturate, and the judge is lenient.** Both setups score 1.00 everywhere, so this test
+- **The answer metrics saturate, and the judge is lenient.** Both setups score at or near 1.00, so this test
   set cannot separate them at the answer stage. Reading the answers shows the difference the judge missed:
   for "when is land development tax due without penalty?", the fixed-chunk answer starts mid-word
   ("ত বৎসরের ৩০ জুন...") and describes when tax becomes overdue instead of stating the 30 June deadline,
   yet it was graded correct. A harder test set and a stricter judge are needed to compare answer quality.
-- **Abstention works.** All 5 unanswerable questions got "I don't know", including two that sit close to the
-  corpus (the e-passport fee and the NID reissue fee), and no answerable question was wrongly refused.
+- **Abstention works, with one flaky refusal.** All 5 unanswerable questions got "I don't know", including two
+  that sit close to the corpus (the e-passport fee and the NID reissue fee). One answerable question, the
+  English one about a certified khatian copy, was refused in the latest sentence-chunk run although the same
+  question was answered correctly in an earlier run and in two manual reruns. It has the weakest retrieval
+  score in the set (0.43), so the model's answer flips between runs. This is the run-to-run noise the
+  30-question set cannot average out; the recorded result is kept as measured.
 - **A similarity cutoff cannot replace the LLM's judgement.** With bge-m3, the lowest-scoring answerable
   question (an English question about a Bangla fee table) scored 0.43, below three unanswerable questions
   (0.51-0.62). The cutoff is therefore only a guard at 0.40 against clearly off-topic questions; the prompt's

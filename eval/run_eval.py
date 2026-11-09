@@ -57,9 +57,9 @@ def retrieval(models):
         for model in models:
             rr, ev_hits = [], []
             for it in items:
-                hits = store.search(it["question"], chunker, model, k=5)
                 if not it["answerable"]:
                     continue
+                hits = store.search(it["question"], chunker, model, k=5)
                 rank = next((i for i, h in enumerate(hits, 1) if h["doc_id"] == it["expected_doc"]), None)
                 rr.append(1 / rank if rank else 0.0)
                 # stricter than doc match: the answering sentence itself must be inside a retrieved chunk
@@ -78,8 +78,13 @@ def judge(it, result):
     context = ans.format_context(result["hits"])
     raw = ans.complete(JUDGE_PROMPT.format(question=it["question"], expected=it["expected_answer"],
                                            context=context, answer=result["answer"]), config.JUDGE_MODEL)
-    m = re.search(r"\{.*\}", raw, re.S)
-    verdict = json.loads(m.group(0)) if m else {}
+    m = re.search(r"\{.*?\}", raw, re.S)  # shortest match: the judge may add text with braces after the JSON
+    try:
+        verdict = json.loads(m.group(0)) if m else {}
+    except ValueError:
+        verdict = {}
+    if not verdict:
+        print(f"  unreadable judge reply for {it['id']}, scored as 0: {raw[:120]!r}")
     return int(verdict.get("correct", 0)), int(verdict.get("grounded", 0))
 
 
@@ -112,20 +117,25 @@ def generate(configs, rpm):
     ans.complete = paced(ans.complete, rpm)  # answer() and judge() both look this up at call time
     items, table_rows = load_testset(), []
     log_path = HERE / "results.jsonl"
-    key = lambda row: (row["config"], row["llm"], row["judge"], row["id"])
-    done = {}  # resume: reuse finished items, free-tier daily quotas are tiny
+    # resume: reuse finished items (free-tier daily quotas are tiny), but only if the question and the
+    # expected answer are unchanged, so editing the test set re-runs exactly the edited items
+    key = lambda row: (row["config"], row["llm"], row["judge"], row["id"], row["question"], row["expected"])
+    done = {}
     if log_path.exists():
-        done = {key(r): r for r in map(json.loads, log_path.read_text(encoding="utf-8").splitlines()) if "judge" in r}
+        done = {key(r): r for r in map(json.loads, log_path.read_text(encoding="utf-8").splitlines())
+                if "expected" in r}
     with open(log_path, "a", encoding="utf-8") as log_file:
         for cfg in configs:
             chunker, model = cfg.split(":", 1)
             rows = []
             for it in items:
-                row = done.get((cfg, config.LLM_MODEL, config.JUDGE_MODEL, it["id"]))
+                row = done.get((cfg, config.LLM_MODEL, config.JUDGE_MODEL, it["id"], it["question"],
+                                it["expected_answer"]))
                 if row is None:
                     r = ans.answer(it["question"], chunker, model)
                     c, g = judge(it, r) if not r["abstained"] else (None, None)
                     row = {"config": cfg, "llm": config.LLM_MODEL, "judge": config.JUDGE_MODEL, "id": it["id"],
+                           "question": it["question"], "expected": it["expected_answer"],
                            "answer": r["answer"], "abstained": r["abstained"],
                            "citations": [x["doc_id"] for x in r["citations"]], "correct": c, "grounded": g}
                     log_file.write(json.dumps(row, ensure_ascii=False) + "\n")

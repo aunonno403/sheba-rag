@@ -48,3 +48,17 @@ def test_generate_resumes_without_repeating_llm_calls(monkeypatch, tmp_path):
     second = run_eval.generate(["sentence:m"], rpm=1000)
     assert calls == ["q1", "q2"]  # everything reused from results.jsonl
     assert first == second and "| 1.00 | 1.00 | 1.00 | 0.00 |" in first
+
+    items[0]["expected_answer"] = "corrected answer"  # reviewing the test set must re-run that item only
+    (tmp_path / "testset.jsonl").write_text("".join(json.dumps(i) + "\n" for i in items), encoding="utf-8")
+    run_eval.generate(["sentence:m"], rpm=1000)
+    assert calls == ["q1", "q2", "q1"]
+
+
+def test_judge_reply_with_extra_braces(monkeypatch):
+    item = {"id": "a1", "question": "q", "expected_answer": "x"}
+    monkeypatch.setattr(run_eval.ans, "complete",
+                        lambda p, m: '{"correct": 1, "grounded": 1} (based on {context})')
+    assert run_eval.judge(item, {"hits": [], "answer": "x"}) == (1, 1)
+    monkeypatch.setattr(run_eval.ans, "complete", lambda p, m: "{not json}")
+    assert run_eval.judge(item, {"hits": [], "answer": "x"}) == (0, 0)

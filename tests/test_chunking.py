@@ -17,6 +17,11 @@ def test_sections_split_on_english_numbers():
     assert [s for s, _ in secs] == [None, "1", "2"]
 
 
+def test_decimal_numbers_are_not_sections():
+    secs = split_sections("২.১ নাগরিক সেবা: হটলাইন ১৬১২২\n৮.২৫ একর পর্যন্ত মওকুফ")
+    assert [s for s, _ in secs] == [None]
+
+
 def test_sentences_split_on_danda_and_english_period():
     s = split_sentences("প্রথম বাক্য। দ্বিতীয় বাক্য? Third one. Fourth")
     assert s == ["প্রথম বাক্য।", "দ্বিতীয় বাক্য?", "Third one.", "Fourth"]

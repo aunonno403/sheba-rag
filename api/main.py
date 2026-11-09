@@ -1,16 +1,26 @@
 """FastAPI backend.  Run: uvicorn api.main:app --reload"""
 import logging
 import os
+from contextlib import asynccontextmanager
 
 import litellm
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from sheba_rag import answer as ans
-from sheba_rag import config
+from sheba_rag import config, store
 
 log = logging.getLogger("sheba_rag.api")
-app = FastAPI(title="Sheba RAG", description="Bangla Q&A over Bangladeshi public-service documents")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    store.embed(config.EMBED_MODEL, ["warmup"], "query")  # load the model now, not on the first question (~20 s)
+    yield
+
+
+app = FastAPI(title="Sheba RAG", description="Bangla Q&A over Bangladeshi public-service documents",
+              lifespan=lifespan)
 
 
 class AskRequest(BaseModel):

@@ -4,8 +4,9 @@ A page is {"page": int | None, "text": str}. A chunk is {"text", "section", "pag
 """
 import re
 
-# A line starting with "১।", "১০।", "1." or "12." opens a numbered section (law sections, numbered steps).
-SECTION_RE = re.compile(r"^\s*([০-৯]+|\d+)\s*[।.]", re.M)
+# A line starting with "১।", "১০।", "1. " or "12. " opens a numbered section (law sections, numbered steps).
+# The "." must be followed by a space, so decimals like "২.১ নাগরিক সেবা" or "৮.২৫ একর" are not sections.
+SECTION_RE = re.compile(r"^\s*([০-৯]+|\d+)\s*(?:।|\.(?=\s))", re.M)
 # Sentence ends: danda / ? / ! anywhere, "." only before whitespace; newlines always break.
 SENT_RE = re.compile(r"(?<=[।?!])\s+|(?<=\.)\s+|\n+")
 

@@ -32,6 +32,18 @@ def test_answer_with_valid_citations(fake):
     assert [c["n"] for c in r["citations"]] == [1]  # [9] matches no block and is dropped
 
 
+def test_bangla_digit_citations(fake):
+    fake("মৌজা ম্যাপের ফি ৬৩০ টাকা [১]।")
+    r = ans.answer("মৌজা ম্যাপ কত টাকা?", min_score=0.5)
+    assert not r["abstained"] and [c["n"] for c in r["citations"]] == [1]
+
+
+def test_comma_and_range_citations(fake):
+    fake("Tax is due by 30 June [1, 2]. See also [1-2].")
+    r = ans.answer("When is the tax due?", min_score=0)
+    assert not r["abstained"] and [c["n"] for c in r["citations"]] == [1, 2]
+
+
 def test_low_score_abstains_without_llm_call(fake):
     calls = fake("should not be used", hits=[{**HITS[0], "score": 0.1}])
     r = ans.answer("Thai visa?", min_score=0.5)

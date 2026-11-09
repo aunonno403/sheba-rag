@@ -1,15 +1,16 @@
+# Versions pinned to what this project was built and tested with (Python 3.13, Windows 11).
 # GPU build of PyTorch (install first on a CUDA machine; the CPU build from PyPI also works):
-#   pip install torch --index-url https://download.pytorch.org/whl/cu126
-torch
-trafilatura
-pymupdf
-requests
-truststore
-sentence-transformers
-chromadb
-litellm
-fastapi
-uvicorn
-streamlit
-python-dotenv
-pytest
+#   pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cu126
+torch==2.14.1
+trafilatura==2.3.1
+pymupdf==2.1
+requests==2.34.2
+truststore==0.10.5
+sentence-transformers==6.2.0
+chromadb==1.5.9
+litellm==1.108.2
+fastapi==0.162.2
+uvicorn==0.54.0
+streamlit==1.67.0
+python-dotenv==1.2.4
+pytest==9.2.0

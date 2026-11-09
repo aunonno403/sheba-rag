@@ -5,6 +5,7 @@
 """
 import argparse
 import csv
+import hashlib
 import json
 import socket
 
@@ -27,8 +28,13 @@ def read_sources():
         return list(csv.DictReader(f))
 
 
+def cache_name(src):
+    # the URL hash makes a changed URL in sources.csv fetch fresh content instead of reusing the old file
+    return f"{src['id']}-{hashlib.sha1(src['url'].encode()).hexdigest()[:8]}"
+
+
 def download(src):
-    path = config.RAW_DIR / src["service"] / f"{src['id']}.{src['type']}"
+    path = config.RAW_DIR / src["service"] / f"{cache_name(src)}.{src['type']}"
     if not path.exists():
         r = requests.get(src["url"], timeout=60, headers={"User-Agent": "Mozilla/5.0 (sheba-rag)"})
         r.raise_for_status()
@@ -39,7 +45,7 @@ def download(src):
 
 def extract(src, path):
     """Pages of text, cached in data/text/<id>.json so OCR runs once."""
-    cache = config.TEXT_DIR / f"{src['id']}.json"
+    cache = config.TEXT_DIR / f"{cache_name(src)}.json"
     if cache.exists():
         return json.loads(cache.read_text(encoding="utf-8"))
     pages = pdf_pages(path) if src["type"] == "pdf" else html_pages(path.read_bytes())
@@ -49,19 +55,24 @@ def extract(src, path):
 
 
 def load_documents():
-    docs = []
+    docs, failed = [], []
     for src in read_sources():
         try:
             path = download(src)
         except requests.RequestException as e:
-            print(f"[skip] {src['id']}: download failed ({e})")
+            print(f"[fail] {src['id']}: download failed ({e})")
+            failed.append(src["id"])
             continue
         print(f"[load] {src['id']}")
         pages = extract(src, path)
         if not any(p["text"].strip() for p in pages):
-            print(f"[skip] {src['id']}: no usable text")
+            print(f"[fail] {src['id']}: no usable text")
+            failed.append(src["id"])
             continue
         docs.append((src, pages))
+    if failed:
+        # building would replace the index without these documents; keep the old index instead
+        raise SystemExit(f"Not rebuilding the index, these sources failed: {', '.join(failed)}")
     return docs
 
 

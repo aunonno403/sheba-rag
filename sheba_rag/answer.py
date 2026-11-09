@@ -44,7 +44,9 @@ def format_context(hits):
 
 def parse_citations(text, hits):
     """Citations the model used, ignoring numbers that match no context block."""
-    nums = sorted({int(n) for n in re.findall(r"\[(\d+)\]", text)})
+    # \d also matches Bangla digits ("[১]"), which int() reads; brackets may hold "1, 2" or "1-3"
+    inside = " ".join(re.findall(r"\[([\d,\s\-–]+)\]", text))
+    nums = sorted({int(n) for n in re.findall(r"\d+", inside)})
     return [
         {"n": n, "title": hits[n - 1]["title"], "section": hits[n - 1].get("section"),
          "page": hits[n - 1].get("page"), "url": hits[n - 1]["url"], "doc_id": hits[n - 1]["doc_id"]}
@@ -59,7 +61,7 @@ def complete(prompt, model):
     return (resp.choices[0].message.content or "").strip()
 
 
-def answer(question, chunker=None, embed_model=None, llm_model=None, min_score=None):
+def answer(question, chunker=None, embed_model=None, min_score=None):
     lang = detect_lang(question)
     min_score = config.MIN_SCORE if min_score is None else min_score
     hits = store.search(question, chunker, embed_model)
@@ -68,7 +70,7 @@ def answer(question, chunker=None, embed_model=None, llm_model=None, min_score=N
         return idk  # nothing relevant enough: skip the LLM call entirely
     prompt = PROMPT.format(language=LANG_NAME[lang], abstain=ABSTAIN_TOKEN,
                            context=format_context(hits), question=question)
-    text = complete(prompt, llm_model or config.LLM_MODEL)
+    text = complete(prompt, config.LLM_MODEL)
     citations = parse_citations(text, hits)
     if ABSTAIN_TOKEN in text or not citations:
         return idk  # an uncited answer is treated as ungrounded
