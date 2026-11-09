@@ -140,14 +140,25 @@ Retrieval, 25 answerable questions, top-5:
 
 Answers, all 30 questions, LLM `gemini/gemini-3.5-flash-lite`, judge `gemini/gemini-3.1-flash-lite`:
 
-*Pending: the run is paced for Gemini's free tier and resumes from `eval/results.jsonl`. The first 5
-questions were all correct and grounded.*
+| chunker | embedding | correctness | groundedness | abstain on unanswerable | false "I don't know" |
+|---|---|---|---|---|---|
+| sentence | bge-m3 | 1.00 | 1.00 | 1.00 | 0.00 |
+| fixed | bge-m3 | 1.00 | 1.00 | 1.00 | 0.00 |
+
+Per-question answers and verdicts are in `eval/results.jsonl`.
 
 Findings:
 - **The embedding model matters most.** bge-m3 beats multilingual-e5-base by 8-12 points on every metric,
   and it handles English questions about Bangla documents well.
 - **Sentence-aware chunking helps a little.** At document level the chunkers tie. With the stricter
   evidence check, fixed windows lose an answer that was cut across a window boundary.
+- **The answer metrics saturate, and the judge is lenient.** Both setups score 1.00 everywhere, so this test
+  set cannot separate them at the answer stage. Reading the answers shows the difference the judge missed:
+  for "when is land development tax due without penalty?", the fixed-chunk answer starts mid-word
+  ("ত বৎসরের ৩০ জুন...") and describes when tax becomes overdue instead of stating the 30 June deadline,
+  yet it was graded correct. A harder test set and a stricter judge are needed to compare answer quality.
+- **Abstention works.** All 5 unanswerable questions got "I don't know", including two that sit close to the
+  corpus (the e-passport fee and the NID reissue fee), and no answerable question was wrongly refused.
 - **A similarity cutoff cannot replace the LLM's judgement.** With bge-m3, the lowest-scoring answerable
   question (an English question about a Bangla fee table) scored 0.43, below three unanswerable questions
   (0.51-0.62). The cutoff is therefore only a guard at 0.40 against clearly off-topic questions; the prompt's
@@ -155,7 +166,8 @@ Findings:
 - **Run-to-run noise was a bug.** Chroma's default `ef_search=10` made top-5 results change between identical
   runs. Raising it to 200, effectively exact search at this size, made results reproducible.
 
-Caveats: 30 questions is a small test set, so one question moves a score by 3-4 points. I drafted the
+Caveats: 30 questions is a small test set, so one question moves a score by 3-4 points. The answer run used
+the free-tier `gemini-3.5-flash-lite`; `gemini-3.5-flash` was not evaluated because of its 20-requests-a-day cap. I drafted the
 expected answers from the sources; they should be reviewed by someone who uses these services. An LLM judge
 can be wrong; per-question verdicts are in `eval/results.jsonl` for inspection.
 
