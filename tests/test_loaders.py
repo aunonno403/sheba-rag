@@ -23,6 +23,21 @@ def test_needs_ocr_for_empty_or_broken_pages():
     assert not needs_ocr(CLEAN * 3)
 
 
+def test_pdf_page_without_usable_text_is_ocrd_or_skipped(monkeypatch, tmp_path):
+    import pymupdf
+    from sheba_rag import loaders
+    path = tmp_path / "scan.pdf"
+    with pymupdf.open() as doc:  # one page with almost no text layer, like a scan
+        doc.new_page().insert_text((72, 72), "x")
+        doc.new_page().insert_text((72, 72), "x")
+        doc.save(path)
+    replies = iter([CLEAN * 2, BROKEN * 3])  # page 1: OCR works; page 2: OCR is garbage too
+    monkeypatch.setattr(loaders, "ocr_page", lambda page: next(replies))
+    pages = loaders.pdf_pages(path, log=lambda msg: None)
+    assert [p["page"] for p in pages] == [1]
+    assert pages[0]["text"].startswith("সেবা প্রদান প্রতিশ্রুতি")
+
+
 def test_html_keeps_bold_faq_questions():
     from sheba_rag.loaders import html_pages
     html = """<html><body><article><h1>FAQ</h1><div class="faq-items">

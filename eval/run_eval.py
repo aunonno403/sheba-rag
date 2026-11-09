@@ -8,6 +8,7 @@ Collections must exist first: python -m sheba_rag.ingest --chunker all --embed <
 """
 import argparse
 import hashlib
+import inspect
 import json
 import re
 import time
@@ -114,9 +115,10 @@ def paced(complete, rpm):
 
 
 def setup_fingerprint(chunker, model):
-    """Changes when a prompt, a retrieval setting or the indexed chunks change, so saved answers made
-    under old settings or an old index are not reused."""
-    text = (ans.PROMPT + JUDGE_PROMPT + f"top_k={config.TOP_K} min_score={config.MIN_SCORE}"
+    """Changes when the answer code (prompt, citation and "I don't know" rules), the judge prompt, a retrieval
+    setting or the indexed chunks change, so saved answers made under old conditions are not reused.
+    Hashing the whole answer module means even a comment edit there re-runs the answer test."""
+    text = (inspect.getsource(ans) + JUDGE_PROMPT + f"top_k={config.TOP_K} min_score={config.MIN_SCORE}"
             + store.index_fingerprint(chunker, model))
     return hashlib.sha1(text.encode()).hexdigest()[:8]
 

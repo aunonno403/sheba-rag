@@ -2,10 +2,11 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 import litellm
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, StringConstraints
 
 from sheba_rag import answer as ans
 from sheba_rag import config, store
@@ -24,7 +25,8 @@ app = FastAPI(title="Sheba RAG", description="Bangla Q&A over Bangladeshi public
 
 
 class AskRequest(BaseModel):
-    question: str = Field(min_length=2, max_length=1000)
+    # trimmed before the length check, so "   " is rejected instead of costing an LLM call
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=1000)]
 
 
 @app.get("/health")
@@ -39,7 +41,7 @@ def ask(req: AskRequest):
     if config.LLM_MODEL.startswith("gemini/") and not os.getenv("GEMINI_API_KEY"):
         raise HTTPException(503, "GEMINI_API_KEY is not set. Copy .env.example to .env and add your key.")
     try:
-        r = ans.answer(req.question.strip())
+        r = ans.answer(req.question)
     except litellm.RateLimitError as e:
         raise HTTPException(429, "The LLM rate limit was reached (free tier). Please try again in a minute.") from e
     except Exception as e:  # LLM/provider or vector-store failure: report it instead of a bare 500

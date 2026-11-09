@@ -56,7 +56,8 @@ def test_generate_resumes_without_repeating_llm_calls(monkeypatch, tmp_path):
     run_eval.generate(["sentence:m"], rpm=1000)
     assert calls == ["q1", "q2", "q1"]
 
-    monkeypatch.setattr(run_eval.ans, "PROMPT", run_eval.ans.PROMPT + "\n- Be brief.")  # a prompt edit re-runs all
+    edited = run_eval.inspect.getsource(run_eval.ans) + "\n# edited citation rule\n"  # any answer.py edit re-runs all
+    monkeypatch.setattr(run_eval.inspect, "getsource", lambda module: edited)
     run_eval.generate(["sentence:m"], rpm=1000)
     assert calls == ["q1", "q2", "q1", "q1", "q2"]
 

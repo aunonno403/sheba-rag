@@ -42,8 +42,12 @@ def test_health_reports_missing_index(monkeypatch):
     assert r["status"] == "ok" and r["chunks"] == 379
 
 
-def test_rejects_empty_question():
-    assert client.post("/ask", json={"question": ""}).status_code == 422
+def test_rejects_empty_or_blank_question(monkeypatch):
+    calls = []
+    monkeypatch.setattr(main.ans, "answer", lambda q: calls.append(q))
+    for blank in ("", "   ", " \n\t "):
+        assert client.post("/ask", json={"question": blank}).status_code == 422
+    assert calls == []  # nothing reached retrieval or the LLM
 
 
 def test_rate_limit_is_friendly_429(monkeypatch):

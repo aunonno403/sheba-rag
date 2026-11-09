@@ -33,3 +33,10 @@ Appended by `python -m eval.run_eval`. Test set: `eval/testset.jsonl` (30 questi
 |---|---|---|---|---|---|---|
 | sentence | bge-m3 | gemini-3.5-flash-lite | 0.96 | 1.00 | 1.00 | 0.04 |
 | fixed | bge-m3 | gemini-3.5-flash-lite | 1.00 | 1.00 | 1.00 | 0.00 |
+
+## generate, 2026-11-09, top-k 5, MIN_SCORE 0.4
+
+| chunker | embedding | LLM | correctness | groundedness | abstain on unanswerable | false 'I don't know' |
+|---|---|---|---|---|---|---|
+| sentence | bge-m3 | gemini-3.5-flash-lite | 0.96 | 1.00 | 1.00 | 0.04 |
+| fixed | bge-m3 | gemini-3.5-flash-lite | 1.00 | 1.00 | 1.00 | 0.00 |
