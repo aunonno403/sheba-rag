@@ -34,6 +34,14 @@ def test_llm_failure_is_503(monkeypatch):
     assert r.status_code == 503 and "quota exceeded" in r.json()["detail"]
 
 
+def test_health_reports_missing_index(monkeypatch):
+    monkeypatch.setattr(main.store, "index_size", lambda: 0)
+    assert client.get("/health").json()["status"].startswith("no index")
+    monkeypatch.setattr(main.store, "index_size", lambda: 379)
+    r = client.get("/health").json()
+    assert r["status"] == "ok" and r["chunks"] == 379
+
+
 def test_rejects_empty_question():
     assert client.post("/ask", json={"question": ""}).status_code == 422
 

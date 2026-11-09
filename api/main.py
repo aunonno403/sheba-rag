@@ -29,7 +29,9 @@ class AskRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "llm": config.LLM_MODEL, "embedding": config.EMBED_MODEL, "chunker": config.CHUNKER}
+    chunks = store.index_size()
+    return {"status": "ok" if chunks else "no index: run python -m sheba_rag.ingest", "chunks": chunks,
+            "llm": config.LLM_MODEL, "embedding": config.EMBED_MODEL, "chunker": config.CHUNKER}
 
 
 @app.post("/ask")

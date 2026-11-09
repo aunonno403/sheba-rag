@@ -1,9 +1,12 @@
 """Embeddings + Chroma. One collection per (chunker, embedding model) so configs can be compared."""
+import hashlib
+import json
 import re
 from functools import lru_cache
 
 import chromadb
 import torch
+from chromadb.errors import NotFoundError
 from sentence_transformers import SentenceTransformer
 
 from sheba_rag import config
@@ -41,6 +44,9 @@ def _client():
 def build(chunks, chunker, model_name):
     """Replace the collection for this config with `chunks` (dicts with text + metadata)."""
     name = collection_name(chunker, model_name)
+    # embed before deleting anything: if this crashes (e.g. GPU out of memory), the old index stays usable.
+    # The doc title is embedded with each chunk so "NID law" style queries find the right document.
+    vectors = embed(model_name, [f"{c['title']}\n{c['text']}" for c in chunks], "passage")
     if name in [c.name for c in _client().list_collections()]:
         _client().delete_collection(name)
     # default ef_search=10 made top-5 results vary between runs; at this corpus size 200 is effectively exact
@@ -48,8 +54,6 @@ def build(chunks, chunker, model_name):
         name, configuration={"hnsw": {"space": "cosine", "ef_search": 200, "ef_construction": 200}},
         embedding_function=None,
     )
-    # the doc title is embedded with each chunk so "NID law" style queries find the right document
-    vectors = embed(model_name, [f"{c['title']}\n{c['text']}" for c in chunks], "passage")
     metas = [{k: v for k, v in c.items() if k != "text" and v is not None} for c in chunks]
     for i in range(0, len(chunks), 1000):  # Chroma caps batch size
         col.add(
@@ -61,10 +65,29 @@ def build(chunks, chunker, model_name):
     return col.count()
 
 
+def _collection(chunker, model_name):
+    return _client().get_collection(collection_name(chunker or config.CHUNKER, model_name or config.EMBED_MODEL))
+
+
+def index_size(chunker=None, model_name=None):
+    """Number of chunks in the index for this config, 0 if ingestion has not been run."""
+    try:
+        return _collection(chunker, model_name).count()
+    except NotFoundError:
+        return 0
+
+
+def index_fingerprint(chunker, model_name):
+    """Changes whenever the indexed chunks change (re-chunking, re-ingesting changed sources)."""
+    data = _collection(chunker, model_name).get(include=["documents", "metadatas"])
+    rows = sorted(zip(data["ids"], data["documents"], (json.dumps(m, sort_keys=True) for m in data["metadatas"])))
+    return hashlib.sha1(json.dumps(rows, ensure_ascii=False).encode()).hexdigest()[:8]
+
+
 def search(query, chunker=None, model_name=None, k=None):
-    chunker, model_name, k = chunker or config.CHUNKER, model_name or config.EMBED_MODEL, k or config.TOP_K
-    col = _client().get_collection(collection_name(chunker, model_name))
-    res = col.query(query_embeddings=embed(model_name, [query], "query"), n_results=k)
+    model_name = model_name or config.EMBED_MODEL
+    res = _collection(chunker, model_name).query(
+        query_embeddings=embed(model_name, [query], "query"), n_results=k or config.TOP_K)
     return [
         {"text": doc, "score": 1 - dist, **meta}
         for doc, dist, meta in zip(res["documents"][0], res["distances"][0], res["metadatas"][0])

@@ -23,6 +23,9 @@ urllib3.util.connection.allowed_gai_family = lambda: socket.AF_INET
 truststore.inject_into_ssl()
 
 
+MIN_DOC_CHARS = 200
+
+
 def read_sources():
     with open(config.SOURCES, encoding="utf-8") as f:
         return list(csv.DictReader(f))
@@ -65,8 +68,10 @@ def load_documents():
             continue
         print(f"[load] {src['id']}")
         pages = extract(src, path)
-        if not any(p["text"].strip() for p in pages):
-            print(f"[fail] {src['id']}: no usable text (cache cleared, the next run downloads it again)")
+        # under 200 characters is an error or bot-check page ("Just a moment..."), not a document;
+        # the smallest real source (the land fees table) has 578
+        if sum(len(p["text"].strip()) for p in pages) < MIN_DOC_CHARS:
+            print(f"[fail] {src['id']}: too little text (cache cleared, the next run downloads it again)")
             path.unlink(missing_ok=True)  # otherwise every later run re-reads the same empty cache
             (config.TEXT_DIR / f"{cache_name(src)}.json").unlink(missing_ok=True)
             failed.append(src["id"])

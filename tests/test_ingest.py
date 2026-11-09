@@ -19,15 +19,21 @@ def test_failed_download_stops_before_index_rebuild(monkeypatch):
     assert built == []  # the existing index was left alone
 
 
-def test_empty_source_clears_its_cache(monkeypatch, tmp_path):
+@pytest.mark.parametrize("html", [
+    "<html><body><script>app()</script></body></html>",  # JavaScript-only page: no text at all
+    "<html><head><title>Just a moment...</title></head><body><article><h1>Just a moment...</h1>"
+    "<p>Checking if the site connection is secure. Enable JavaScript and cookies to continue.</p>"
+    "</article></body></html>",  # bot-check page: a little text, but not a document
+])
+def test_empty_or_bot_check_source_fails_and_clears_its_cache(monkeypatch, tmp_path, html):
     monkeypatch.setattr(ingest, "read_sources", lambda: [SRC])
     monkeypatch.setattr(ingest.config, "RAW_DIR", tmp_path / "raw")
     monkeypatch.setattr(ingest.config, "TEXT_DIR", tmp_path / "text")
 
-    def fake_download(src):  # a JavaScript-only page: downloads fine, has no text
+    def fake_download(src):
         path = tmp_path / "raw" / f"{ingest.cache_name(src)}.html"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("<html><body><script>app()</script></body></html>", encoding="utf-8")
+        path.write_text(html, encoding="utf-8")
         return path
     monkeypatch.setattr(ingest, "download", fake_download)
     with pytest.raises(SystemExit, match="nid_faq"):

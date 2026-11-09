@@ -113,9 +113,11 @@ def paced(complete, rpm):
     return wrapper
 
 
-def setup_fingerprint():
-    """Changes when a prompt or retrieval setting changes, so saved answers made under old settings are not reused."""
-    text = ans.PROMPT + JUDGE_PROMPT + f"top_k={config.TOP_K} min_score={config.MIN_SCORE}"
+def setup_fingerprint(chunker, model):
+    """Changes when a prompt, a retrieval setting or the indexed chunks change, so saved answers made
+    under old settings or an old index are not reused."""
+    text = (ans.PROMPT + JUDGE_PROMPT + f"top_k={config.TOP_K} min_score={config.MIN_SCORE}"
+            + store.index_fingerprint(chunker, model))
     return hashlib.sha1(text.encode()).hexdigest()[:8]
 
 
@@ -124,10 +126,9 @@ def generate(configs, rpm):
     items, table_rows = load_testset(), []
     log_path = HERE / "results.jsonl"
     # resume: reuse finished items (free-tier daily quotas are tiny), but only if the question, the expected
-    # answer and the prompts/settings are unchanged, so any edit re-runs exactly what it affects
+    # answer, the prompts/settings and the index are unchanged, so any edit re-runs exactly what it affects
     key = lambda row: (row["config"], row["llm"], row["judge"], row["setup"], row["id"], row["question"],
                        row["expected"])
-    setup = setup_fingerprint()
     done = {}
     if log_path.exists():
         done = {key(r): r for r in map(json.loads, log_path.read_text(encoding="utf-8").splitlines())
@@ -135,6 +136,7 @@ def generate(configs, rpm):
     with open(log_path, "a", encoding="utf-8") as log_file:
         for cfg in configs:
             chunker, model = cfg.split(":", 1)
+            setup = setup_fingerprint(chunker, model)
             rows = []
             for it in items:
                 row = done.get((cfg, config.LLM_MODEL, config.JUDGE_MODEL, setup, it["id"], it["question"],

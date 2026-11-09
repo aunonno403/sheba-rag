@@ -33,6 +33,8 @@ def test_generate_resumes_without_repeating_llm_calls(monkeypatch, tmp_path):
     ]
     (tmp_path / "testset.jsonl").write_text("".join(json.dumps(i) + "\n" for i in items), encoding="utf-8")
     monkeypatch.setattr(run_eval, "HERE", tmp_path)
+    index = {"fp": "idx1"}
+    monkeypatch.setattr(run_eval.store, "index_fingerprint", lambda chunker, model: index["fp"])
     calls = []
 
     def fake_answer(q, chunker, model):
@@ -57,6 +59,10 @@ def test_generate_resumes_without_repeating_llm_calls(monkeypatch, tmp_path):
     monkeypatch.setattr(run_eval.ans, "PROMPT", run_eval.ans.PROMPT + "\n- Be brief.")  # a prompt edit re-runs all
     run_eval.generate(["sentence:m"], rpm=1000)
     assert calls == ["q1", "q2", "q1", "q1", "q2"]
+
+    index["fp"] = "idx2"  # re-ingesting with different chunks re-runs everything too
+    run_eval.generate(["sentence:m"], rpm=1000)
+    assert calls == ["q1", "q2", "q1", "q1", "q2", "q1", "q2"]
 
 
 def test_judge_reply_parsing(monkeypatch):

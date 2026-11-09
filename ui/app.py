@@ -49,6 +49,8 @@ if question:
             else:
                 detail = r.json().get("detail", r.text) if "json" in r.headers.get("content-type", "") else r.text
                 data = {"answer": f"⚠️ {detail}", "citations": []}
+        except requests.Timeout:  # the API can be busy retrying a slow LLM; it is not down
+            data = {"answer": "⚠️ The answer is taking too long. Please try again.", "citations": []}
         except requests.RequestException as e:
             data = {"answer": f"⚠️ API not reachable at {API_URL}: {e}", "citations": []}
     bot_msg = {"role": "assistant", "content": data["answer"], "citations": data.get("citations", [])}
