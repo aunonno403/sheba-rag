@@ -46,7 +46,10 @@ def parse_citations(text, hits):
     """Citations the model used, ignoring numbers that match no context block."""
     # \d also matches Bangla digits ("[১]"), which int() reads; brackets may hold "1, 2" or "1-3"
     inside = " ".join(re.findall(r"\[([\d,\s\-–]+)\]", text))
-    nums = sorted({int(n) for n in re.findall(r"\d+", inside)})
+    nums = {int(n) for n in re.findall(r"\d+", inside)}
+    for a, b in re.findall(r"(\d+)\s*[-–]\s*(\d+)", inside):  # fill in ranges, capped so "[1-99999999]" stays small
+        nums |= set(range(int(a), min(int(b), len(hits)) + 1))
+    nums = sorted(nums)
     return [
         {"n": n, "title": hits[n - 1]["title"], "section": hits[n - 1].get("section"),
          "page": hits[n - 1].get("page"), "url": hits[n - 1]["url"], "doc_id": hits[n - 1]["doc_id"]}

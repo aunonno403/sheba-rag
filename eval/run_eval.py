@@ -7,6 +7,7 @@
 Collections must exist first: python -m sheba_rag.ingest --chunker all --embed <model> ...
 """
 import argparse
+import hashlib
 import json
 import re
 import time
@@ -78,14 +79,13 @@ def judge(it, result):
     context = ans.format_context(result["hits"])
     raw = ans.complete(JUDGE_PROMPT.format(question=it["question"], expected=it["expected_answer"],
                                            context=context, answer=result["answer"]), config.JUDGE_MODEL)
-    m = re.search(r"\{.*?\}", raw, re.S)  # shortest match: the judge may add text with braces after the JSON
     try:
-        verdict = json.loads(m.group(0)) if m else {}
-    except ValueError:
-        verdict = {}
-    if not verdict:
-        print(f"  unreadable judge reply for {it['id']}, scored as 0: {raw[:120]!r}")
-    return int(verdict.get("correct", 0)), int(verdict.get("grounded", 0))
+        # raw_decode reads one JSON object from the first "{" and ignores any text after it
+        verdict, _ = json.JSONDecoder().raw_decode(raw[raw.index("{"):])
+        return int(verdict["correct"]), int(verdict["grounded"])
+    except (ValueError, KeyError, TypeError) as e:
+        # never save a made-up 0: stop here, and a resumed run asks the judge again
+        raise ValueError(f"unreadable judge reply for {it['id']}: {raw[:200]!r}") from e
 
 
 TRANSIENT = (litellm.InternalServerError, litellm.ServiceUnavailableError, litellm.Timeout,
@@ -113,28 +113,37 @@ def paced(complete, rpm):
     return wrapper
 
 
+def setup_fingerprint():
+    """Changes when a prompt or retrieval setting changes, so saved answers made under old settings are not reused."""
+    text = ans.PROMPT + JUDGE_PROMPT + f"top_k={config.TOP_K} min_score={config.MIN_SCORE}"
+    return hashlib.sha1(text.encode()).hexdigest()[:8]
+
+
 def generate(configs, rpm):
     ans.complete = paced(ans.complete, rpm)  # answer() and judge() both look this up at call time
     items, table_rows = load_testset(), []
     log_path = HERE / "results.jsonl"
-    # resume: reuse finished items (free-tier daily quotas are tiny), but only if the question and the
-    # expected answer are unchanged, so editing the test set re-runs exactly the edited items
-    key = lambda row: (row["config"], row["llm"], row["judge"], row["id"], row["question"], row["expected"])
+    # resume: reuse finished items (free-tier daily quotas are tiny), but only if the question, the expected
+    # answer and the prompts/settings are unchanged, so any edit re-runs exactly what it affects
+    key = lambda row: (row["config"], row["llm"], row["judge"], row["setup"], row["id"], row["question"],
+                       row["expected"])
+    setup = setup_fingerprint()
     done = {}
     if log_path.exists():
         done = {key(r): r for r in map(json.loads, log_path.read_text(encoding="utf-8").splitlines())
-                if "expected" in r}
+                if "setup" in r}
     with open(log_path, "a", encoding="utf-8") as log_file:
         for cfg in configs:
             chunker, model = cfg.split(":", 1)
             rows = []
             for it in items:
-                row = done.get((cfg, config.LLM_MODEL, config.JUDGE_MODEL, it["id"], it["question"],
+                row = done.get((cfg, config.LLM_MODEL, config.JUDGE_MODEL, setup, it["id"], it["question"],
                                 it["expected_answer"]))
                 if row is None:
                     r = ans.answer(it["question"], chunker, model)
                     c, g = judge(it, r) if not r["abstained"] else (None, None)
-                    row = {"config": cfg, "llm": config.LLM_MODEL, "judge": config.JUDGE_MODEL, "id": it["id"],
+                    row = {"config": cfg, "llm": config.LLM_MODEL, "judge": config.JUDGE_MODEL, "setup": setup,
+                           "id": it["id"],
                            "question": it["question"], "expected": it["expected_answer"],
                            "answer": r["answer"], "abstained": r["abstained"],
                            "citations": [x["doc_id"] for x in r["citations"]], "correct": c, "grounded": g}

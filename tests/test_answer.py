@@ -44,6 +44,12 @@ def test_comma_and_range_citations(fake):
     assert not r["abstained"] and [c["n"] for c in r["citations"]] == [1, 2]
 
 
+def test_citation_ranges_are_filled_in_and_capped():
+    hits = [{"title": str(i), "url": "u", "doc_id": f"d{i}"} for i in range(1, 6)]
+    assert [c["n"] for c in ans.parse_citations("x [1-3]", hits)] == [1, 2, 3]
+    assert [c["n"] for c in ans.parse_citations("x [2–99999999]", hits)] == [2, 3, 4, 5]
+
+
 def test_low_score_abstains_without_llm_call(fake):
     calls = fake("should not be used", hits=[{**HITS[0], "score": 0.1}])
     r = ans.answer("Thai visa?", min_score=0.5)

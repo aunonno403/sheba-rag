@@ -66,7 +66,9 @@ def load_documents():
         print(f"[load] {src['id']}")
         pages = extract(src, path)
         if not any(p["text"].strip() for p in pages):
-            print(f"[fail] {src['id']}: no usable text")
+            print(f"[fail] {src['id']}: no usable text (cache cleared, the next run downloads it again)")
+            path.unlink(missing_ok=True)  # otherwise every later run re-reads the same empty cache
+            (config.TEXT_DIR / f"{cache_name(src)}.json").unlink(missing_ok=True)
             failed.append(src["id"])
             continue
         docs.append((src, pages))

@@ -54,11 +54,19 @@ def test_generate_resumes_without_repeating_llm_calls(monkeypatch, tmp_path):
     run_eval.generate(["sentence:m"], rpm=1000)
     assert calls == ["q1", "q2", "q1"]
 
+    monkeypatch.setattr(run_eval.ans, "PROMPT", run_eval.ans.PROMPT + "\n- Be brief.")  # a prompt edit re-runs all
+    run_eval.generate(["sentence:m"], rpm=1000)
+    assert calls == ["q1", "q2", "q1", "q1", "q2"]
 
-def test_judge_reply_with_extra_braces(monkeypatch):
+
+def test_judge_reply_parsing(monkeypatch):
+    import pytest
     item = {"id": "a1", "question": "q", "expected_answer": "x"}
-    monkeypatch.setattr(run_eval.ans, "complete",
-                        lambda p, m: '{"correct": 1, "grounded": 1} (based on {context})')
-    assert run_eval.judge(item, {"hits": [], "answer": "x"}) == (1, 1)
-    monkeypatch.setattr(run_eval.ans, "complete", lambda p, m: "{not json}")
-    assert run_eval.judge(item, {"hits": [], "answer": "x"}) == (0, 0)
+    for reply in ('{"correct": 1, "grounded": 1} (based on {context})',
+                  'Sure: {"correct": 1, "grounded": 1, "notes": {"why": "ok"}}'):
+        monkeypatch.setattr(run_eval.ans, "complete", lambda p, m, reply=reply: reply)
+        assert run_eval.judge(item, {"hits": [], "answer": "x"}) == (1, 1)
+    for reply in ("{not json}", "no json at all", '{"correct": 1}'):
+        monkeypatch.setattr(run_eval.ans, "complete", lambda p, m, reply=reply: reply)
+        with pytest.raises(ValueError, match="unreadable judge reply"):
+            run_eval.judge(item, {"hits": [], "answer": "x"})
