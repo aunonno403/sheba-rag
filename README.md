@@ -165,43 +165,60 @@ Retrieval, 29 answerable questions, top-5:
 
 Answers, all 34 questions, LLM `gemini/gemini-3.5-flash-lite`, judge `gemini/gemini-3.1-flash-lite`:
 
-| chunker | embedding | prompt | correctness | groundedness | abstain on unanswerable | false "I don't know" |
-|---|---|---|---|---|---|---|
-| sentence | bge-m3 | original | 0.93 | 1.00 | 1.00 | 0.07 |
-| fixed | bge-m3 | original | 1.00 | 0.97 | 1.00 | 0.00 |
-| sentence | bge-m3 | revised | 0.97 | 0.97 | 1.00 | 0.00 |
-| fixed | bge-m3 | revised | 1.00 | 1.00 | 1.00 | 0.00 |
+| run | chunker | correctness | groundedness | abstain on unanswerable | false "I don't know" |
+|---|---|---|---|---|---|
+| 1. original prompt | sentence | 0.93 | 1.00 | 1.00 | 0.07 |
+| 1. original prompt | fixed | 1.00 | 0.97 | 1.00 | 0.00 |
+| 2. revised prompt | sentence | 0.97 | 0.97 | 1.00 | 0.00 |
+| 2. revised prompt | fixed | 1.00 | 1.00 | 1.00 | 0.00 |
+| 3. revised prompt, table-aware chunks (current) | sentence | 1.00 | 1.00 | 1.00 | 0.00 |
+| 3. revised prompt, table-aware chunks (current) | fixed | 0.97 | 1.00 | 1.00 | 0.03 |
 
-Per-question answers and verdicts for the revised prompt are in `eval/results.jsonl`; every run's table is
-in `eval/results.md`.
+All runs use bge-m3. Per-question answers and verdicts for run 3 are in `eval/results.jsonl`; every run's
+table is in `eval/results.md`.
 
-**The prompt was revised after seeing the first run, so the "revised" rows are optimistic.** The first run
-wrongly refused two fee questions and garbled one price. I added two rules (give every matching case and add
-up listed parts; copy numbers exactly) and tested them on those same questions before the full re-run. A
-fair measure of the revised prompt needs questions it was not tuned on.
+**Read these scores as optimistic, for two reasons.**
+- *The system was tuned on this test set.* After run 1 wrongly refused two fee questions and garbled a
+  price, I added two prompt rules (give every matching case and add up listed parts; copy numbers exactly).
+  After run 2 read the wrong row of the fee table, I changed the sentence chunker to keep table rows with
+  their headings. Both changes were checked on the failing questions before the full re-run. A fair measure
+  needs questions the system was not tuned on.
+- *The judge missed an error in run 3.* I read the fee answers by hand. For the 10-year 48-page passport, the
+  sentence-chunk answer gives the right fees inside Bangladesh but states USD 100 for general applicants at
+  missions; the page says USD 125. The judge graded it correct and grounded. Counting that, sentence chunks
+  have 28 of 29 answers fully correct, not 29.
 
 Findings:
 - **The embedding model matters most.** bge-m3 beats multilingual-e5-base by 7-21 points on the hit and
   evidence metrics, and it handles English questions about Bangla documents well.
-- **Sentence-aware chunking helps retrieval a little, not answers.** With the stricter evidence check, fixed
-  windows lose an answer that was cut across a window boundary. At the answer stage fixed chunks scored
-  higher, but the gap is one question out of 29, which this test set cannot tell from noise.
+- **Sentence-aware chunking helps retrieval a little; the answer scores cannot separate the chunkers.** With
+  the stricter evidence check, fixed windows lose answers that were cut across a window boundary. At the
+  answer stage the two setups differ by one or two questions out of 29 in every run, in either direction, which
+  this test set cannot tell from noise. Fixed chunks changed between runs 2 and 3 without any change to
+  their code: the source titles are embedded with each chunk, their wording changed slightly, and one
+  question ("can someone else collect my passport?") dropped out of the top 5 and was refused.
 - **A strict "answer only from context" prompt over-refuses.** The first run refused "what is the total
   mutation fee?" because the page lists three parts and no total, and refused the passport fee question
   because the context held several matching cases (inside Bangladesh, missions abroad, three delivery
   types). The right text was retrieved both times. Telling the model to give each case and to add up listed
   parts fixed both without making it answer the unanswerable questions.
-- **Flattened tables are the weak spot.** Chunking cuts fee rows off from their headings: one chunk starts
-  with "- Regular delivery : USD 50" and no passport type. With sentence chunks the model then read the
-  wrong row, answering TK 6,325 (regular) for the express price of a 64-page 5-year passport, which is
-  TK 8,625. The judge marked it wrong and ungrounded. Keeping headings with their rows is the next fix.
+- **Flattened tables need table-aware chunking.** The fee page is a nested list: a group ("inside
+  Bangladesh", "Mission's Labors and Students"), a passport type, then price rows. Plain sentence packing
+  cut rows off from their headings: one chunk started with "- Regular delivery : USD 50" and no passport
+  type, and in run 2 the model answered TK 6,325 (regular) for an express price that is TK 8,625. Carrying
+  each row's headings into its chunk fixed that question, but the fees inside Bangladesh were still buried
+  at the end of a chunk about paying at a bank, and the model then answered only from the mission fees.
+  Starting a new chunk where a table begins gave each fee group its own chunk and fixed that too.
+- **Even with clean chunks the small model mixes up neighbouring figures.** In run 3 it copied USD 100, the
+  5-year price, into a 10-year answer. A stronger model or a check of every quoted figure against the cited
+  chunk is the next step for fee answers.
 - **The small model garbles numbers.** Before the "copy numbers exactly" rule, `gemini-3.5-flash-lite` wrote
   "৮,০৫৮ টাকা (অথবা ৮,০৫০ টাকা)" for TK 8,050 and "১০,৩৫টা" for 10,350 when converting digits to Bangla.
   With the rule it copies figures as "TK 8,050".
-- **The judge is lenient.** For "when is land development tax due without penalty?", the fixed-chunk answer
-  still starts mid-word ("ত বৎসরের ৩০ জুন...") and describes when tax becomes overdue instead of stating the
-  30 June deadline, yet it was graded correct in every run. A stricter judge is needed to compare answer
-  quality.
+- **The judge is lenient.** It passed the wrong USD figure above. And for "when is land development tax due
+  without penalty?", the fixed-chunk answer still starts mid-word ("ত বৎসরের ৩০ জুন...") and describes when
+  tax becomes overdue instead of stating the 30 June deadline, yet it was graded correct in every run. A
+  stricter judge is needed to compare answer quality.
 - **Abstention works.** All 5 unanswerable questions got "I don't know" in every run, including the NID
   reissue fee and an emergency travel permit fee, which sit close to the corpus.
 - **A similarity cutoff cannot replace the LLM's judgement.** With bge-m3, the lowest-scoring answerable

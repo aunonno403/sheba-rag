@@ -88,3 +88,10 @@ Appended by `python -m eval.run_eval`. Test set: `eval/testset.jsonl` (30 questi
 | sentence | multilingual-e5-base | 0.83 | 0.90 | 0.85 | 0.86 |
 | fixed | bge-m3 | 0.93 | 0.97 | 0.94 | 0.93 |
 | fixed | multilingual-e5-base | 0.72 | 0.90 | 0.80 | 0.83 |
+
+## generate, 2026-11-12, top-k 5, MIN_SCORE 0.4
+
+| chunker | embedding | LLM | correctness | groundedness | abstain on unanswerable | false 'I don't know' |
+|---|---|---|---|---|---|---|
+| sentence | bge-m3 | gemini-3.5-flash-lite | 1.00 | 1.00 | 1.00 | 0.00 |
+| fixed | bge-m3 | gemini-3.5-flash-lite | 0.97 | 1.00 | 1.00 | 0.03 |
