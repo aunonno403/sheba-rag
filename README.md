@@ -160,34 +160,53 @@ Retrieval, 29 answerable questions, top-5:
 
 Answers, all 34 questions, LLM `gemini/gemini-3.5-flash-lite`, judge `gemini/gemini-3.1-flash-lite`:
 
-*Pending: being re-run after the corpus change of 2026-11-10 (new epassport.gov.bd pages, list packing).
-The previous run on the 30-question set scored 0.96-1.00 on every answer metric; see `eval/results.md`.
-The findings below still refer to that run until it is redone.*
+| chunker | embedding | prompt | correctness | groundedness | abstain on unanswerable | false "I don't know" |
+|---|---|---|---|---|---|---|
+| sentence | bge-m3 | original | 0.93 | 1.00 | 1.00 | 0.07 |
+| fixed | bge-m3 | original | 1.00 | 0.97 | 1.00 | 0.00 |
+| sentence | bge-m3 | revised | 0.97 | 0.97 | 1.00 | 0.00 |
+| fixed | bge-m3 | revised | 1.00 | 1.00 | 1.00 | 0.00 |
+
+Per-question answers and verdicts for the revised prompt are in `eval/results.jsonl`; every run's table is
+in `eval/results.md`.
+
+**The prompt was revised after seeing the first run, so the "revised" rows are optimistic.** The first run
+wrongly refused two fee questions and garbled one price. I added two rules (give every matching case and add
+up listed parts; copy numbers exactly) and tested them on those same questions before the full re-run. A
+fair measure of the revised prompt needs questions it was not tuned on.
 
 Findings:
-- **The embedding model matters most.** bge-m3 beats multilingual-e5-base by 8-12 points on every metric,
-  and it handles English questions about Bangla documents well.
-- **Sentence-aware chunking helps a little.** At document level the chunkers tie. With the stricter
-  evidence check, fixed windows lose an answer that was cut across a window boundary.
-- **The answer metrics saturate, and the judge is lenient.** Both setups score at or near 1.00, so this test
-  set cannot separate them at the answer stage. Reading the answers shows the difference the judge missed:
-  for "when is land development tax due without penalty?", the fixed-chunk answer starts mid-word
-  ("ত বৎসরের ৩০ জুন...") and describes when tax becomes overdue instead of stating the 30 June deadline,
-  yet it was graded correct. A harder test set and a stricter judge are needed to compare answer quality.
-- **Abstention works, with one flaky refusal.** All 5 unanswerable questions got "I don't know", including two
-  that sit close to the corpus (the e-passport fee and the NID reissue fee). One answerable question, the
-  English one about a certified khatian copy, was refused in the latest sentence-chunk run although the same
-  question was answered correctly in an earlier run and in two manual reruns. It has the weakest retrieval
-  score in the set (0.43), so the model's answer flips between runs. This is the run-to-run noise the
-  30-question set cannot average out; the recorded result is kept as measured.
+- **The embedding model matters most.** bge-m3 beats multilingual-e5-base by 7-21 points on the hit and
+  evidence metrics, and it handles English questions about Bangla documents well.
+- **Sentence-aware chunking helps retrieval a little, not answers.** With the stricter evidence check, fixed
+  windows lose an answer that was cut across a window boundary. At the answer stage fixed chunks scored
+  higher, but the gap is one question out of 29, which this test set cannot tell from noise.
+- **A strict "answer only from context" prompt over-refuses.** The first run refused "what is the total
+  mutation fee?" because the page lists three parts and no total, and refused the passport fee question
+  because the context held several matching cases (inside Bangladesh, missions abroad, three delivery
+  types). The right text was retrieved both times. Telling the model to give each case and to add up listed
+  parts fixed both without making it answer the unanswerable questions.
+- **Flattened tables are the weak spot.** Chunking cuts fee rows off from their headings: one chunk starts
+  with "- Regular delivery : USD 50" and no passport type. With sentence chunks the model then read the
+  wrong row, answering TK 6,325 (regular) for the express price of a 64-page 5-year passport, which is
+  TK 8,625. The judge marked it wrong and ungrounded. Keeping headings with their rows is the next fix.
+- **The small model garbles numbers.** Before the "copy numbers exactly" rule, `gemini-3.5-flash-lite` wrote
+  "৮,০৫৮ টাকা (অথবা ৮,০৫০ টাকা)" for TK 8,050 and "১০,৩৫টা" for 10,350 when converting digits to Bangla.
+  With the rule it copies figures as "TK 8,050".
+- **The judge is lenient.** For "when is land development tax due without penalty?", the fixed-chunk answer
+  still starts mid-word ("ত বৎসরের ৩০ জুন...") and describes when tax becomes overdue instead of stating the
+  30 June deadline, yet it was graded correct in every run. A stricter judge is needed to compare answer
+  quality.
+- **Abstention works.** All 5 unanswerable questions got "I don't know" in every run, including the NID
+  reissue fee and an emergency travel permit fee, which sit close to the corpus.
 - **A similarity cutoff cannot replace the LLM's judgement.** With bge-m3, the lowest-scoring answerable
-  question (an English question about a Bangla fee table) scored 0.43, below three unanswerable questions
-  (0.51-0.62). The cutoff is therefore only a guard at 0.40 against clearly off-topic questions; the prompt's
+  question (an English question about a Bangla fee table) scored 0.48, below all five unanswerable questions
+  (0.51-0.67). The cutoff is therefore only a guard at 0.40 against clearly off-topic questions; the prompt's
   abstain instruction and the "no citation means no answer" rule do the real work.
 - **Run-to-run noise was a bug.** Chroma's default `ef_search=10` made top-5 results change between identical
   runs. Raising it to 200, effectively exact search at this size, made results reproducible.
 
-Caveats: 30 questions is a small test set, so one question moves a score by 3-4 points. The answer run used
+Caveats: 34 questions is a small test set, so one question moves a score by 3-4 points. The answer run used
 the free-tier `gemini-3.5-flash-lite`; `gemini-3.5-flash` was not evaluated because of its 20-requests-a-day cap. I drafted the
 expected answers from the sources; they should be reviewed by someone who uses these services. An LLM judge
 can be wrong; per-question verdicts are in `eval/results.jsonl` for inspection.

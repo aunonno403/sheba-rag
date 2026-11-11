@@ -17,6 +17,8 @@ Rules:
 - Reply in {language}, even if the context is in another language.
 - After every fact, cite its block number in square brackets, e.g. [1] or [2][3].
 - If the context does not contain the answer, reply with exactly {abstain} and nothing else.
+- The context may be in another language than the question and may be a list or a table. If it holds the requested figures, answer with them. When several cases match the question (for example delivery types, or applicants inside Bangladesh and abroad), give each case. When a total is asked and only the parts are listed, give the parts and their sum.
+- Copy every number exactly as it appears in the context.
 - Be concise: 1-4 sentences or a short list. Do not add facts that are not in the context.
 
 Context:
