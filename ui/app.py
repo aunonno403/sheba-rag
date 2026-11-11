@@ -36,8 +36,10 @@ def render(msg):
 for m in st.session_state.messages:
     render(m)
 
-question = st.chat_input("আপনার প্রশ্ন লিখুন…", submit_mode="disable", key="question") or picked
-if question:
+question = (st.chat_input("আপনার প্রশ্ন লিখুন…", submit_mode="disable", key="question") or picked or "").strip()
+if len(question) == 1:  # the API rejects anything under 2 characters; say so plainly instead of showing its error
+    st.warning("অনুগ্রহ করে একটি প্রশ্ন লিখুন। Please type a question.")
+elif question:
     user_msg = {"role": "user", "content": question}
     st.session_state.messages.append(user_msg)
     render(user_msg)

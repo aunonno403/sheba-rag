@@ -1,13 +1,13 @@
-id,service,lang,type,title,url,file
-epassport_fees,passport,en,html,"e-Passport fees (epassport.gov.bd, saved 2026-11-10)",https://www.epassport.gov.bd/instructions/passport-fees,data/manual/passport_fees.html
-epassport_instructions,passport,bn,html,"ই-পাসপোর্ট ফরম পূরণের নির্দেশাবলী (epassport.gov.bd, saved 2026-11-10)",https://www.epassport.gov.bd/instructions/instructions,data/manual/ই-পাসপোর্ট ফরম পূরণের নির্দেশাবলী.html
-epassport_checklist,passport,bn,html,"Documents Checklist for e-Passport Enrollment (epassport.gov.bd, saved 2026-11-10)",https://www.epassport.gov.bd/landing/notices/160,data/manual/Documents Checklist for e-Passport Enrollment.html
-epassport_documents,passport,en,html,"e-Passport required documents (epassport.gov.bd, saved 2026-11-10)",https://www.epassport.gov.bd/landing/notices/34,data/manual/Documents.html
-epassport_offices,passport,en,html,"List of functional e-Passport Offices (epassport.gov.bd, saved 2026-11-10)",https://www.epassport.gov.bd/landing/notices/33,data/manual/List of functional e-Passport Offices.html
-epassport_steps,passport,en,html,"5 Steps to your e-Passport (epassport.gov.bd, saved 2026-11-10)",https://www.epassport.gov.bd/instructions/five-step-to-your-epassport,data/manual/5 Steps to your e-Passport.html
-passport_order_1973,passport,en,html,The Bangladesh Passport Order 1973,http://bdlaws.minlaw.gov.bd/act-print-445.html,
-nid_faq,nid,bn,html,জাতীয় পরিচয়পত্র সচরাচর জিজ্ঞাসা (নির্বাচন কমিশন),https://services.nidw.gov.bd/nid-pub/faq?tab=faq-general,
-nid_act_2023,nid,bn,html,"জাতীয় পরিচয় নিবন্ধন আইন, ২০২৩",http://bdlaws.minlaw.gov.bd/act-print-1458.html,
-land_fees,land,bn,html,ভূমিসেবার নির্ধারিত ফি (ভূমি মন্ত্রণালয়),https://land.gov.bd/vumisheba-fee?lang=bn,
-land_tax_act_2023,land,bn,html,"ভূমি উন্নয়ন কর আইন, ২০২৩",http://bdlaws.minlaw.gov.bd/act-print-1449.html,
-land_charter,land,bn,pdf,ভূমি মন্ত্রণালয় সিটিজেন চার্টার,https://objectstorage.ap-dcc-gazipur-1.oraclecloud15.com/n/axvjbnqprylg/b/V2Ministry/o/office-minland/2024/12/be12c4ed76e04dd8932caf876cc15e71.pdf,
+id,service,lang,type,title,url,file,saved,sha1
+epassport_fees,passport,en,html,e-Passport fees (epassport.gov.bd),https://www.epassport.gov.bd/instructions/passport-fees,data/manual/passport_fees.html,2026-11-10,3a25468b
+epassport_instructions,passport,bn,html,ই-পাসপোর্ট ফরম পূরণের নির্দেশাবলী (epassport.gov.bd),https://www.epassport.gov.bd/instructions/instructions,data/manual/ই-পাসপোর্ট ফরম পূরণের নির্দেশাবলী.html,2026-11-10,049f9f6b
+epassport_checklist,passport,bn,html,Documents Checklist for e-Passport Enrollment (epassport.gov.bd),https://www.epassport.gov.bd/landing/notices/160,data/manual/Documents Checklist for e-Passport Enrollment.html,2026-11-10,1e633ad8
+epassport_documents,passport,en,html,e-Passport required documents (epassport.gov.bd),https://www.epassport.gov.bd/landing/notices/34,data/manual/Documents.html,2026-11-10,347d6836
+epassport_offices,passport,en,html,List of functional e-Passport Offices (epassport.gov.bd),https://www.epassport.gov.bd/landing/notices/33,data/manual/List of functional e-Passport Offices.html,2026-11-10,8f61a2c8
+epassport_steps,passport,en,html,5 Steps to your e-Passport (epassport.gov.bd),https://www.epassport.gov.bd/instructions/five-step-to-your-epassport,data/manual/5 Steps to your e-Passport.html,2026-11-10,18c7ac1c
+passport_order_1973,passport,en,html,The Bangladesh Passport Order 1973,http://bdlaws.minlaw.gov.bd/act-print-445.html,,,
+nid_faq,nid,bn,html,জাতীয় পরিচয়পত্র সচরাচর জিজ্ঞাসা (নির্বাচন কমিশন),https://services.nidw.gov.bd/nid-pub/faq?tab=faq-general,,,
+nid_act_2023,nid,bn,html,"জাতীয় পরিচয় নিবন্ধন আইন, ২০২৩",http://bdlaws.minlaw.gov.bd/act-print-1458.html,,,
+land_fees,land,bn,html,ভূমিসেবার নির্ধারিত ফি (ভূমি মন্ত্রণালয়),https://land.gov.bd/vumisheba-fee?lang=bn,,,
+land_tax_act_2023,land,bn,html,"ভূমি উন্নয়ন কর আইন, ২০২৩",http://bdlaws.minlaw.gov.bd/act-print-1449.html,,,
+land_charter,land,bn,pdf,ভূমি মন্ত্রণালয় সিটিজেন চার্টার,https://objectstorage.ap-dcc-gazipur-1.oraclecloud15.com/n/axvjbnqprylg/b/V2Ministry/o/office-minland/2024/12/be12c4ed76e04dd8932caf876cc15e71.pdf,,,

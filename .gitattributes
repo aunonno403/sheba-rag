@@ -1,0 +1,2 @@
+# hand-saved pages are checked by content hash; keep their bytes identical on every OS
+data/manual/* -text

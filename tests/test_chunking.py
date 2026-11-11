@@ -36,6 +36,32 @@ def test_short_numbered_list_is_packed_not_one_chunk_per_line():
     assert [c["section"] for c in chunks] == ["1–13", "14–28", "29–40"]
 
 
+def test_table_rows_keep_their_headings_across_chunks():
+    def group(name, currency):
+        return f"e-Passport fees for {name}\n" + "\n".join(
+            f"e-Passport with {pages} pages and {years} years validity\n"
+            f"- Regular delivery: {currency} {pages}{years}1\n- Express delivery: {currency} {pages}{years}2"
+            for pages in (48, 64) for years in (5, 10))
+    text = "Fees can be paid online or at a bank.\n" + group("inside Bangladesh", "TK") + "\n" + group(
+        "Bangladesh Missions", "USD")
+    chunks = sentence_chunks([{"page": None, "text": text}], max_chars=330, min_chars=0)
+    assert len(chunks) >= 3
+    for c in chunks[1:]:
+        assert c["text"].startswith("e-Passport fees for ")  # the group heading comes along
+        assert not c["text"].split(" e-Passport with")[0].count("delivery")  # no orphan price row before a heading
+    for c in chunks:
+        assert not c["text"].endswith("validity")  # no heading left behind without its rows
+    # every price sits in a chunk that also names its group and its passport type
+    for name, cur in (("inside Bangladesh", "TK"), ("Bangladesh Missions", "USD")):
+        for pages in (48, 64):
+            for years in (5, 10):
+                row = f"- Express delivery: {cur} {pages}{years}2"
+                home = next(c["text"] for c in chunks if row in c["text"])
+                assert f"fees for {name}" in home
+                before = home[:home.index(row)]
+                assert before.rstrip().rsplit("e-Passport with ", 1)[1].startswith(f"{pages} pages and {years} years")
+
+
 def test_sentence_chunks_respect_sections_and_size():
     pages = [{"page": None, "text": LAW}]
     chunks = sentence_chunks(pages, max_chars=60, min_chars=0)

@@ -41,10 +41,34 @@ def _label(sections):
     return named[0] if named[0] == named[-1] else f"{named[0]}–{named[-1]}"
 
 
+def _is_row(line):
+    return line.startswith(("-", "•"))
+
+
+def _headings(lines):
+    """For each line, the heading lines above it that it needs to make sense: [group heading, heading]
+    for a list or table row ("- Express delivery: TK 8,625"), [group heading] for a heading. Prose gets [].
+    A heading is a line directly above rows; a group heading is a line directly above a heading."""
+    out, group, head = [], None, None
+    for i, line in enumerate(lines):
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        if _is_row(line):
+            out.append([h for h in (group, head) if h])
+        elif _is_row(nxt):
+            head = line
+            out.append([group] if group else [])
+        else:  # prose ends a table, unless this line is the group heading of the next one
+            starts_group = i + 2 < len(lines) and _is_row(lines[i + 2])
+            group, head = (line if starts_group else None), None
+            out.append([])
+    return out
+
+
 def sentence_chunks(pages, max_chars=1000, min_chars=300):
     """Pack sentences into chunks of at most max_chars. A numbered section starts a new chunk, unless the
     current chunk is still under min_chars: then short sections (list items like "19. Sylhet") are packed
-    together instead of becoming one tiny chunk each."""
+    together instead of becoming one tiny chunk each. A chunk that starts inside a list or table starts
+    with that row's headings, so a price is never cut off from what it is the price of."""
     chunks = []
     for p in pages:
         cur = []  # (sentence, section) pairs
@@ -57,14 +81,22 @@ def sentence_chunks(pages, max_chars=1000, min_chars=300):
             if cur and len(" ".join(s for s, _ in cur)) >= min_chars:
                 flush()
                 cur = []
-            for s in split_sentences(sec_text):
-                # a single over-long "sentence" (e.g. an OCR'd table row) is hard-split
-                for part in _windows(s, max_chars, 0) if len(s) > max_chars else [s]:
-                    if cur and len(" ".join(x for x, _ in cur + [(part, None)])) > max_chars:
+            # a single over-long "sentence" (e.g. an OCR'd table row) is hard-split
+            parts = [w for s in split_sentences(sec_text)
+                     for w in (_windows(s, max_chars, 0) if len(s) > max_chars else [s])]
+            for part, heads in zip(parts, _headings(parts)):
+                if cur and len(" ".join(x for x, _ in cur + [(part, None)])) > max_chars:
+                    while cur and cur[-1][0] in heads:  # a heading moves to the next chunk with its rows
+                        cur.pop()
+                    last = cur[-1] if cur else None
+                    if cur:
                         flush()
-                        last = cur[-1]
-                        cur = [last] if len(last[0]) + 1 + len(part) <= max_chars else []  # one-sentence overlap
-                    cur.append((part, section))
+                    if heads:
+                        cur = [(h, section) for h in heads]
+                    else:  # prose: one-sentence overlap (never a lone table row)
+                        fits = last and not _is_row(last[0]) and len(last[0]) + 1 + len(part) <= max_chars
+                        cur = [last] if fits else []
+                cur.append((part, section))
         if cur:
             flush()
     return chunks

@@ -86,12 +86,17 @@ flowchart LR
 | Land | [ভূমি উন্নয়ন কর আইন, ২০২৩](http://bdlaws.minlaw.gov.bd/act-print-1449.html) | bn | HTML |
 | Land | Ministry of Land citizen charter, 53 pages | bn | PDF, OCR |
 
-The epassport.gov.bd pages were saved on 2026-11-10 and will go stale when the site changes; re-save them
-and re-run ingestion.
+Keeping the corpus current:
+- **Downloaded pages** are cached in `data/raw`. Run `python -m sheba_rag.ingest --refresh` to download them
+  again; a failed download keeps the last good copy.
+- **Hand-saved pages** (epassport.gov.bd, saved on 2026-11-10) go stale when the site changes. Save the page
+  again over the old file and run ingestion: it stops and prints the file's new `sha1`. Put that and the new
+  `saved` date in `data/sources.csv`, then run ingestion again. Citations show the saved date, so this check
+  keeps it true.
 
 Add a document by dropping a row into `data/sources.csv` and re-running ingestion. For a page that blocks
-scripts, save it from your browser into `data/manual/` and put its path in the `file` column; the `url`
-column stays the official address used in citations.
+scripts, save it from your browser into `data/manual/` and fill in the `file`, `saved` and `sha1` columns
+(ingestion prints the `sha1` to use); the `url` column stays the official address used in citations.
 
 ## Setup (Windows, tested; Linux/macOS similar)
 
@@ -154,8 +159,8 @@ Retrieval, 29 answerable questions, top-5:
 | chunker | embedding | hit@1 | hit@5 | MRR | evidence@5 |
 |---|---|---|---|---|---|
 | sentence | bge-m3 | 0.90 | 1.00 | 0.94 | **1.00** |
-| fixed | bge-m3 | 0.93 | 1.00 | 0.95 | 0.97 |
-| sentence | multilingual-e5-base | 0.83 | 0.90 | 0.84 | 0.86 |
+| fixed | bge-m3 | 0.93 | 0.97 | 0.94 | 0.93 |
+| sentence | multilingual-e5-base | 0.83 | 0.90 | 0.85 | 0.83 |
 | fixed | multilingual-e5-base | 0.72 | 0.90 | 0.80 | 0.83 |
 
 Answers, all 34 questions, LLM `gemini/gemini-3.5-flash-lite`, judge `gemini/gemini-3.1-flash-lite`:

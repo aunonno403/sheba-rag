@@ -90,7 +90,7 @@ Skipped files are logged, never silently ingested.
 - `sentence` (default): split on Bangla and English sentence ends (`।`, `?`,
   `!`, `.` followed by space or line end) and on numbered law sections, then
   pack sentences up to about 400 tokens with one-sentence overlap. A chunk
-  never crosses a section boundary.
+  does not cross a section boundary, except that sections under 300 characters are packed together.
 - `fixed` (baseline): fixed 1,000-character windows with 150 overlap.
 - Section detection: a line starting with a section number (`১।`, `১০।`,
   `1.`) or a chapter heading (`অধ্যায়`, `CHAPTER`) starts a new section.
@@ -200,3 +200,7 @@ BM25 search, reranking, streaming, chat memory, auth, Docker, deployment.
 - 2026-11-10: the dip.gov.bd passport page was replaced by six epassport.gov.bd pages saved by hand in a browser
   (`data/manual/`, `file` column in `sources.csv`), because the site blocks scripted access and the older page
   contradicted it. Sentence chunking now packs short numbered sections (lists) up to 300 characters.
+- 2026-11-12: the text cache is keyed by file content (a re-saved or re-downloaded page is re-extracted), hand-saved
+  pages carry a `saved` date and `sha1` in `sources.csv` that ingestion checks, `--refresh` re-downloads, and a chunk
+  that starts inside a list or table starts with that row's headings. The answer prompt gained two rules (give every
+  matching case and add up parts; copy numbers exactly) after the first run on the new corpus over-refused.

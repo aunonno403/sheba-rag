@@ -2,6 +2,7 @@
 
     python -m sheba_rag.ingest                      # default chunker + embedding model from .env
     python -m sheba_rag.ingest --chunker all --embed BAAI/bge-m3 --embed intfloat/multilingual-e5-base
+    python -m sheba_rag.ingest --refresh            # download every page again instead of reusing data/raw
 """
 import argparse
 import csv
@@ -36,14 +37,22 @@ def cache_name(src):
     return f"{src['id']}-{hashlib.sha1(src['url'].encode()).hexdigest()[:8]}"
 
 
-def download(src):
+def content_hash(path):
+    return hashlib.sha1(path.read_bytes()).hexdigest()[:8]
+
+
+def download(src, refresh=False):
     if src.get("file"):  # a page saved by hand in a browser (the site blocks scripts); `url` stays the citation
         path = config.ROOT / src["file"]
         if not path.exists():
             raise requests.RequestException(f"saved file not found: {src['file']}")
+        if content_hash(path) != src.get("sha1"):
+            # a re-saved page must get a new `saved` date, which citations show; the hash makes that unmissable
+            raise requests.RequestException(
+                f"{src['file']} changed: set its `saved` date and sha1={content_hash(path)} in data/sources.csv")
         return path
     path = config.RAW_DIR / src["service"] / f"{cache_name(src)}.{src['type']}"
-    if not path.exists():
+    if refresh or not path.exists():  # a failed refresh raises before the old copy is overwritten
         r = requests.get(src["url"], timeout=60, headers={"User-Agent": "Mozilla/5.0 (sheba-rag)"})
         r.raise_for_status()
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -51,9 +60,14 @@ def download(src):
     return path
 
 
+def text_cache(src, path):
+    return config.TEXT_DIR / f"{src['id']}-{content_hash(path)}.json"
+
+
 def extract(src, path):
-    """Pages of text, cached in data/text/<id>.json so OCR runs once."""
-    cache = config.TEXT_DIR / f"{cache_name(src)}.json"
+    """Pages of text, cached in data/text so OCR runs once. The cache is keyed by the file's content,
+    so a re-saved or re-downloaded page is extracted again instead of reusing old text."""
+    cache = text_cache(src, path)
     if cache.exists():
         return json.loads(cache.read_text(encoding="utf-8"))
     pages = pdf_pages(path) if src["type"] == "pdf" else html_pages(path.read_bytes())
@@ -62,13 +76,13 @@ def extract(src, path):
     return pages
 
 
-def load_documents():
+def load_documents(refresh=False):
     docs, failed = [], []
     for src in read_sources():
         try:
-            path = download(src)
+            path = download(src, refresh)
         except requests.RequestException as e:
-            print(f"[fail] {src['id']}: download failed ({e})")
+            print(f"[fail] {src['id']}: {e}")
             failed.append(src["id"])
             continue
         print(f"[load] {src['id']}")
@@ -77,9 +91,9 @@ def load_documents():
         # the smallest real source (the land fees table) has 578
         if sum(len(p["text"].strip()) for p in pages) < MIN_DOC_CHARS:
             print(f"[fail] {src['id']}: too little text (cache cleared, the next run reads it again)")
+            text_cache(src, path).unlink(missing_ok=True)
             if not src.get("file"):  # never delete a hand-saved page, it is the only copy
                 path.unlink(missing_ok=True)  # otherwise every later run re-reads the same empty download
-            (config.TEXT_DIR / f"{cache_name(src)}.json").unlink(missing_ok=True)
             failed.append(src["id"])
             continue
         docs.append((src, pages))
@@ -93,7 +107,8 @@ def chunk_documents(docs, chunker):
     chunks = []
     for src, pages in docs:
         for c in CHUNKERS[chunker](pages):
-            chunks.append({**c, "doc_id": src["id"], "title": src["title"], "url": src["url"],
+            title = f"{src['title']}, saved {src['saved']}" if src.get("saved") else src["title"]
+            chunks.append({**c, "doc_id": src["id"], "title": title, "url": src["url"],
                            "service": src["service"], "lang": src["lang"]})
     return chunks
 
@@ -102,11 +117,12 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--chunker", default=config.CHUNKER, choices=[*CHUNKERS, "all"])
     ap.add_argument("--embed", action="append", help="embedding model (repeatable)")
+    ap.add_argument("--refresh", action="store_true", help="download every page again")
     args = ap.parse_args(argv)
     chunkers = list(CHUNKERS) if args.chunker == "all" else [args.chunker]
     models = args.embed or [config.EMBED_MODEL]
 
-    docs = load_documents()
+    docs = load_documents(args.refresh)
     for chunker in chunkers:
         chunks = chunk_documents(docs, chunker)
         for model in models:
