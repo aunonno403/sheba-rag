@@ -62,6 +62,17 @@ def test_table_rows_keep_their_headings_across_chunks():
                 assert before.rstrip().rsplit("e-Passport with ", 1)[1].startswith(f"{pages} pages and {years} years")
 
 
+def test_a_table_starts_its_own_chunk_after_long_prose():
+    prose = " ".join(f"Sentence number {i} explains how to pay at a bank." for i in range(8))  # over min_chars
+    table = ("Fees inside Bangladesh\nPassport with 48 pages\n- Regular: TK 4,025\n- Express: TK 6,325\n"
+             "Fees at missions\nPassport with 48 pages\n- Regular: USD 100\n- Express: USD 150")
+    chunks = sentence_chunks([{"page": None, "text": prose + "\n" + table}], max_chars=1000, min_chars=300)
+    assert [c["text"].split(" Passport")[0] for c in chunks[1:]] == ["Fees inside Bangladesh"]
+    assert "TK 4,025" not in chunks[0]["text"]  # the prices are not buried at the end of the prose chunk
+    # short groups stay together; a group only gets its own chunk once the current one is big enough
+    assert "USD 150" in chunks[1]["text"]
+
+
 def test_sentence_chunks_respect_sections_and_size():
     pages = [{"page": None, "text": LAW}]
     chunks = sentence_chunks(pages, max_chars=60, min_chars=0)

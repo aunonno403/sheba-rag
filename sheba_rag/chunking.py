@@ -84,8 +84,14 @@ def sentence_chunks(pages, max_chars=1000, min_chars=300):
             # a single over-long "sentence" (e.g. an OCR'd table row) is hard-split
             parts = [w for s in split_sentences(sec_text)
                      for w in (_windows(s, max_chars, 0) if len(s) > max_chars else [s])]
-            for part, heads in zip(parts, _headings(parts)):
-                if cur and len(" ".join(x for x, _ in cur + [(part, None)])) > max_chars:
+            for i, (part, heads) in enumerate(zip(parts, _headings(parts))):
+                # a list or table (or a new group in one) starts here: give it its own chunk, so its
+                # rows are not buried at the end of a chunk about something else
+                new_table = not heads and not _is_row(part) and any(_is_row(x) for x in parts[i + 1:i + 3])
+                if cur and new_table and len(" ".join(x for x, _ in cur)) >= min_chars:
+                    flush()
+                    cur = []
+                elif cur and len(" ".join(x for x, _ in cur + [(part, None)])) > max_chars:
                     while cur and cur[-1][0] in heads:  # a heading moves to the next chunk with its rows
                         cur.pop()
                     last = cur[-1] if cur else None
